@@ -18,7 +18,7 @@ namespace OrdersApi.Controllers
             _configuration = configuration;
         }
 
-        [HttpPost("login")]
+        [HttpPost("Generartoken")]
         public IActionResult Login(LoginRequestDto request)
         {
             // Solo para ejercicio. En sistema real esto se valida contra BD o proveedor de identidad.
