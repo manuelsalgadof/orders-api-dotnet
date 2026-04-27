@@ -60,7 +60,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         sqlOptions => sqlOptions.EnableRetryOnFailure()
     ));
 
-// DI
+// Dependency Injection
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IJobRepository, JobRepository>();
@@ -94,16 +94,10 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// =======================
 // Health Check
-// =======================
-
 builder.Services.AddHealthChecks();
 
-// =======================
 // Rate Limiting
-// =======================
-
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -125,7 +119,7 @@ var app = builder.Build();
 // Middleware
 // =======================
 
-// Swagger en raíz
+// Swagger en raíz "/"
 app.UseSwagger();
 
 app.UseSwaggerUI(c =>
@@ -136,16 +130,15 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 
-// Rate limiting
 app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Health endpoint
+// /health queda SIN rate limiting
 app.MapHealthChecks("/health");
 
-// Controllers con rate limiting
+// Controllers quedan CON rate limiting
 app.MapControllers()
    .RequireRateLimiting("fixed");
 
