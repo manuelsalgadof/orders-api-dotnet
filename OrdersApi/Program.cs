@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+// Swagger
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -92,28 +94,59 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// =======================
+// Health Check
+// =======================
+
+builder.Services.AddHealthChecks();
+
+// =======================
+// Rate Limiting
+// =======================
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("fixed", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
 var app = builder.Build();
 
 // =======================
 // Middleware
 // =======================
 
+// Swagger en raíz
 app.UseSwagger();
 
 app.UseSwaggerUI(c =>
 {
-    // Swagger UI en la raíz
     c.RoutePrefix = string.Empty;
-
-    // Endpoint correcto del JSON
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "Orders API v1");
 });
 
 app.UseHttpsRedirection();
 
+// Rate limiting
+app.UseRateLimiter();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+// Health endpoint
+app.MapHealthChecks("/health");
+
+// Controllers con rate limiting
+app.MapControllers()
+   .RequireRateLimiting("fixed");
 
 app.Run();
