@@ -98,12 +98,15 @@ var app = builder.Build();
 // Middleware
 // =======================
 
-// Swagger en la raíz "/"
 app.UseSwagger();
 
 app.UseSwaggerUI(c =>
 {
+    // Swagger UI en la raíz
     c.RoutePrefix = string.Empty;
+
+    // Endpoint correcto del JSON
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Orders API v1");
 });
 
 app.UseHttpsRedirection();
