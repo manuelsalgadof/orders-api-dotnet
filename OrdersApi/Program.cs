@@ -11,32 +11,31 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// =======================
+// Services
+// =======================
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddEndpointsApiExplorer();
-try
+
+builder.Services.AddSwaggerGen(options =>
 {
-
-    builder.Services.AddSwaggerGen(options =>
+    options.SwaggerDoc("v1", new OpenApiInfo
     {
-        options.SwaggerDoc("v1", new OpenApiInfo
-        {
-            Title = "Orders API",
-            Version = "v1"
-        });
+        Title = "Orders API",
+        Version = "v1"
+    });
 
-        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-        {
-            Description = "Ingrese el token JWT usando el formato: Bearer {token}",
-            Name = "Authorization",
-            In = ParameterLocation.Header,
-            Type = SecuritySchemeType.ApiKey,
-            Scheme = "Bearer"
-        });
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "Ingrese el token JWT usando el formato: Bearer {token}",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
 
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme
@@ -50,26 +49,25 @@ try
             Array.Empty<string>()
         }
     });
-    });
-}
-catch (Exception ex)
-{
+});
 
-    throw;
-}
-
+// DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection"),
         sqlOptions => sqlOptions.EnableRetryOnFailure()
     ));
+
+// DI
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IJobRepository, JobRepository>();
 builder.Services.AddScoped<IJobService, JobService>();
+
 builder.Services.AddSingleton<IBackgroundJobQueue, BackgroundJobQueue>();
 builder.Services.AddHostedService<JobWorker>();
 
+// JWT
 var jwtKey = builder.Configuration["Jwt:Key"]!;
 var issuer = builder.Configuration["Jwt:Issuer"]!;
 var audience = builder.Configuration["Jwt:Audience"]!;
@@ -96,8 +94,17 @@ builder.Services.AddAuthentication(options =>
 
 var app = builder.Build();
 
+// =======================
+// Middleware
+// =======================
+
+// Swagger en la raíz "/"
 app.UseSwagger();
-app.UseSwaggerUI();
+
+app.UseSwaggerUI(c =>
+{
+    c.RoutePrefix = string.Empty;
+});
 
 app.UseHttpsRedirection();
 
@@ -105,17 +112,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-
-try
-{
-    app.MapControllers();
-}
-catch (Exception ex)
-{
-
-    throw;
-}
-
 
 app.Run();
