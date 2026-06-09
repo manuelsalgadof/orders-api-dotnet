@@ -2,8 +2,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OrdersApi.DTOs
 {
-    public class LoginRequestDto
+    public class CreateUserDto
     {
+        [Required]
+        [MaxLength(150)]
+        public string Name { get; set; } = string.Empty;
+
         [Required]
         [EmailAddress]
         [MaxLength(256)]

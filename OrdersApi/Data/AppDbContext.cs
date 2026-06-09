@@ -24,7 +24,7 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<OrderItem> OrderItems { get; set; }
 
-
+    public virtual DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -76,6 +76,24 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.OrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_OrderItems_Orders");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_Users");
+
+            entity.HasIndex(e => e.Email, "UX_Users_Email").IsUnique();
+
+            entity.Property(e => e.Name).HasMaxLength(150);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.PasswordHash).HasMaxLength(256);
+            entity.Property(e => e.Role)
+                .HasMaxLength(50)
+                .HasDefaultValue("Admin");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValue("Active");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
         });
 
         OnModelCreatingPartial(modelBuilder);

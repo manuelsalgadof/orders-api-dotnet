@@ -66,6 +66,9 @@ builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IJobRepository, JobRepository>();
 builder.Services.AddScoped<IJobService, JobService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IPasswordHasherService, PasswordHasherService>();
 
 builder.Services.AddSingleton<IBackgroundJobQueue, BackgroundJobQueue>();
 builder.Services.AddHostedService<JobWorker>();
@@ -120,7 +123,7 @@ var app = builder.Build();
 // Middleware
 // =======================
 
-// Swagger en raíz "/"
+// Swagger en raï¿½z "/"
 app.UseSwagger();
 
 app.UseSwaggerUI(c =>
@@ -144,5 +147,11 @@ app.MapHealthChecks("/health");
 // Controllers quedan CON rate limiting
 app.MapControllers()
    .RequireRateLimiting("fixed");
+
+using (var scope = app.Services.CreateScope())
+{
+    var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+    await userService.SeedAdminIfNoneExistsAsync(app.Configuration);
+}
 
 app.Run();

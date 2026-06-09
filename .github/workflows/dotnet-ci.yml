@@ -75,4 +75,7 @@ jobs:
             --set-env-vars \
               ASPNETCORE_ENVIRONMENT=Production \
               ASPNETCORE_URLS=http://+:8080 \
-              ConnectionStrings__DefaultConnection="${{ secrets.DB_CONNECTION }}"
+              ConnectionStrings__DefaultConnection="${{ secrets.DB_CONNECTION }}" \
+              AdminSeed__Name="${{ secrets.ADMIN_SEED_NAME }}" \
+              AdminSeed__Email="${{ secrets.ADMIN_SEED_EMAIL }}" \
+              AdminSeed__Password="${{ secrets.ADMIN_SEED_PASSWORD }}"

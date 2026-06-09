@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using OrdersApi.DTOs;
+using OrdersApi.Entities;
+using OrdersApi.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -12,33 +14,31 @@ namespace OrdersApi.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly IUserService _userService;
 
-        public AuthController(IConfiguration configuration)
+        public AuthController(IConfiguration configuration, IUserService userService)
         {
             _configuration = configuration;
+            _userService   = userService;
         }
 
         [HttpPost("Generartoken")]
-        public IActionResult Login(LoginRequestDto request)
+        public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
-            // Solo para ejercicio. En sistema real esto se valida contra BD o proveedor de identidad.
-            if (request.Username != "admin" || request.Password != "1234")
-            {
+            var user = await _userService.ValidateCredentialsAsync(request.Email, request.Password);
+
+            if (user is null)
                 return Unauthorized(new { message = "Credenciales inválidas." });
-            }
 
-            var token = GenerateJwtToken(request.Username);
+            var token = GenerateJwtToken(user);
 
-            return Ok(new LoginResponseDto
-            {
-                Token = token
-            });
+            return Ok(new LoginResponseDto { Token = token });
         }
 
-        private string GenerateJwtToken(string username)
+        private string GenerateJwtToken(User user)
         {
-            var jwtKey = _configuration["Jwt:Key"]!;
-            var issuer = _configuration["Jwt:Issuer"]!;
+            var jwtKey   = _configuration["Jwt:Key"]!;
+            var issuer   = _configuration["Jwt:Issuer"]!;
             var audience = _configuration["Jwt:Audience"]!;
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
@@ -46,8 +46,9 @@ namespace OrdersApi.Controllers
 
             var claims = new[]
             {
-                new Claim(ClaimTypes.Name, username),
-                new Claim(ClaimTypes.Role, "Admin")
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Email),
+                new Claim(ClaimTypes.Role, user.Role)
             };
 
             var token = new JwtSecurityToken(
