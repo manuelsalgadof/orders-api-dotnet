@@ -101,6 +101,24 @@ builder.Services.AddAuthentication(options =>
 // Health Check
 builder.Services.AddHealthChecks();
 
+// CORS — orígenes desde configuración por ambiente (nunca wildcard)
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? Array.Empty<string>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        if (allowedOrigins.Length > 0)
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        else
+            policy.SetIsOriginAllowed(_ => false);
+    });
+});
+
 // Rate Limiting
 builder.Services.AddRateLimiter(options =>
 {
@@ -144,6 +162,8 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseHttpsRedirection();
+
+app.UseCors("FrontendPolicy");
 
 app.UseMiddleware<RequestLoggingMiddleware>();
 
