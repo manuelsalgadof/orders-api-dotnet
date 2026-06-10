@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Moq;
 using OrdersApi.DTOs;
 using OrdersApi.Entities;
@@ -9,15 +10,17 @@ namespace OrdersApi.Tests.Services
 {
     public class UserServiceTests
     {
-        private readonly Mock<IUserRepository>      _repositoryMock;
+        private readonly Mock<IUserRepository>        _repositoryMock;
         private readonly Mock<IPasswordHasherService> _hasherMock;
-        private readonly UserService                _service;
+        private readonly Mock<ILogger<UserService>>   _loggerMock;
+        private readonly UserService                  _service;
 
         public UserServiceTests()
         {
             _repositoryMock = new Mock<IUserRepository>();
             _hasherMock     = new Mock<IPasswordHasherService>();
-            _service        = new UserService(_repositoryMock.Object, _hasherMock.Object);
+            _loggerMock     = new Mock<ILogger<UserService>>();
+            _service        = new UserService(_repositoryMock.Object, _hasherMock.Object, _loggerMock.Object);
         }
 
         // ─── CreateAsync ─────────────────────────────────────────────────────
@@ -207,6 +210,20 @@ namespace OrdersApi.Tests.Services
             );
         }
 
+        [Fact]
+        public async Task DeleteAsync_WhenDeletingSelf_ThrowsInvalidOperationException()
+        {
+            var user = new User { Id = 5, Role = "Admin", Status = "Active" };
+            _repositoryMock.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(user);
+
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => _service.DeleteAsync(5, requestingUserId: 5)
+            );
+
+            Assert.Contains("propio usuario", ex.Message);
+            _repositoryMock.Verify(r => r.DeleteAsync(It.IsAny<User>()), Times.Never);
+        }
+
         // ─── SeedAdminIfNoneExistsAsync ───────────────────────────────────────
 
         [Fact]
@@ -214,7 +231,9 @@ namespace OrdersApi.Tests.Services
         {
             _repositoryMock.Setup(r => r.HasAnyUserAsync()).ReturnsAsync(true);
 
-            await _service.SeedAdminIfNoneExistsAsync(new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object);
+            await _service.SeedAdminIfNoneExistsAsync(
+                new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
+                isProduction: false);
 
             _repositoryMock.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Never);
         }
@@ -232,13 +251,45 @@ namespace OrdersApi.Tests.Services
             configMock.Setup(c => c["AdminSeed:Email"])   .Returns("admin@seed.com");
             configMock.Setup(c => c["AdminSeed:Password"]).Returns("Admin123!");
 
-            await _service.SeedAdminIfNoneExistsAsync(configMock.Object);
+            await _service.SeedAdminIfNoneExistsAsync(configMock.Object, isProduction: false);
 
             _repositoryMock.Verify(r => r.CreateAsync(It.Is<User>(u =>
                 u.Email  == "admin@seed.com" &&
                 u.Role   == "Admin"          &&
                 u.Status == "Active"
             )), Times.Once);
+        }
+
+        [Fact]
+        public async Task SeedAdmin_WhenProductionEmptyUsersAndMissingConfig_Throws()
+        {
+            _repositoryMock.Setup(r => r.HasAnyUserAsync()).ReturnsAsync(false);
+            var configMock = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => _service.SeedAdminIfNoneExistsAsync(configMock.Object, isProduction: true)
+            );
+
+            _repositoryMock.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SeedAdmin_WhenDevelopmentEmptyUsersAndMissingConfig_LogsWarningAndReturns()
+        {
+            _repositoryMock.Setup(r => r.HasAnyUserAsync()).ReturnsAsync(false);
+            var configMock = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
+
+            await _service.SeedAdminIfNoneExistsAsync(configMock.Object, isProduction: false);
+
+            _repositoryMock.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Never);
+            _loggerMock.Verify(
+                l => l.Log(
+                    It.Is<Microsoft.Extensions.Logging.LogLevel>(lvl => lvl == Microsoft.Extensions.Logging.LogLevel.Warning),
+                    It.IsAny<Microsoft.Extensions.Logging.EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception?>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
         }
     }
 }

@@ -12,6 +12,6 @@ namespace OrdersApi.Interfaces
         Task<UserListItemDto> UpdateAsync(int id, UpdateUserDto dto);
         Task DeleteAsync(int id, int requestingUserId);
         Task<User?> ValidateCredentialsAsync(string email, string password);
-        Task SeedAdminIfNoneExistsAsync(IConfiguration configuration);
+        Task SeedAdminIfNoneExistsAsync(IConfiguration configuration, bool isProduction);
     }
 }

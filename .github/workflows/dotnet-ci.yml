@@ -60,6 +60,21 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Validate required deployment secrets
+        env:
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+          ADMIN_SEED_NAME: ${{ secrets.ADMIN_SEED_NAME }}
+          ADMIN_SEED_EMAIL: ${{ secrets.ADMIN_SEED_EMAIL }}
+          ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+        run: |
+          missing=0
+          [ -z "$JWT_KEY" ]             && echo "::error::JWT_KEY secret is missing or empty"             && missing=1
+          [ -z "$ADMIN_SEED_NAME" ]     && echo "::error::ADMIN_SEED_NAME secret is missing or empty"     && missing=1
+          [ -z "$ADMIN_SEED_EMAIL" ]    && echo "::error::ADMIN_SEED_EMAIL secret is missing or empty"    && missing=1
+          [ -z "$ADMIN_SEED_PASSWORD" ] && echo "::error::ADMIN_SEED_PASSWORD secret is missing or empty" && missing=1
+          [ "$missing" -ne 0 ] && exit 1
+          echo "All required secrets present."
+
       - name: Deploy Container App
         uses: azure/container-apps-deploy-action@v1
         with:
@@ -78,4 +93,5 @@ jobs:
               ConnectionStrings__DefaultConnection="${{ secrets.DB_CONNECTION }}" \
               AdminSeed__Name="${{ secrets.ADMIN_SEED_NAME }}" \
               AdminSeed__Email="${{ secrets.ADMIN_SEED_EMAIL }}" \
-              AdminSeed__Password="${{ secrets.ADMIN_SEED_PASSWORD }}"
+              AdminSeed__Password="${{ secrets.ADMIN_SEED_PASSWORD }}" \
+              Jwt__Key="${{ secrets.JWT_KEY }}"

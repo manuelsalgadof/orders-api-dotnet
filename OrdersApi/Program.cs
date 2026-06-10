@@ -119,6 +119,17 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Jwt:Key guard — fail-fast en Production si placeholder o vacío
+const string jwtPlaceholder = "CHANGE_ME_USE_ENVIRONMENT_VARIABLE";
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey == jwtPlaceholder)
+{
+    if (app.Environment.IsProduction())
+        throw new InvalidOperationException(
+            "Jwt:Key no está configurado o usa el placeholder en Production. " +
+            "Configura el secret JWT_KEY antes de desplegar.");
+    app.Logger.LogWarning("Jwt:Key usa placeholder o está vacío en ambiente no-productivo. No apto para producción.");
+}
+
 // =======================
 // Middleware
 // =======================
@@ -151,7 +162,7 @@ app.MapControllers()
 using (var scope = app.Services.CreateScope())
 {
     var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-    await userService.SeedAdminIfNoneExistsAsync(app.Configuration);
+    await userService.SeedAdminIfNoneExistsAsync(app.Configuration, app.Environment.IsProduction());
 }
 
 app.Run();

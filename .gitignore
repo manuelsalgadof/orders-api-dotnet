@@ -21,3 +21,6 @@ Thumbs.db
 
 # Publish
 publish/
+
+# Auditorías locales (evidencias operacionales — no commitear)
+_auditoria/

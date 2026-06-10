@@ -72,7 +72,8 @@ namespace OrdersApi.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var requestingUserId = GetRequestingUserId();
+            if (!TryGetRequestingUserId(out var requestingUserId))
+                return Unauthorized(new { message = "Token inválido." });
 
             try
             {
@@ -89,10 +90,14 @@ namespace OrdersApi.Controllers
             }
         }
 
-        private int GetRequestingUserId()
+        private bool TryGetRequestingUserId(out int userId)
         {
+            userId = 0;
             var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return int.TryParse(claim, out var id) ? id : 0;
+            if (string.IsNullOrWhiteSpace(claim)) return false;
+            if (!int.TryParse(claim, out var parsed) || parsed <= 0) return false;
+            userId = parsed;
+            return true;
         }
     }
 }

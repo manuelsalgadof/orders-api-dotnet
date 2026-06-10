@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OrdersApi.DTOs;
 using OrdersApi.Entities;
 using OrdersApi.Exceptions;
@@ -12,11 +13,13 @@ namespace OrdersApi.Services
     {
         private readonly IUserRepository _repository;
         private readonly IPasswordHasherService _hasher;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(IUserRepository repository, IPasswordHasherService hasher)
+        public UserService(IUserRepository repository, IPasswordHasherService hasher, ILogger<UserService> logger)
         {
             _repository = repository;
             _hasher     = hasher;
+            _logger     = logger;
         }
 
         public async Task<UserListItemDto> CreateAsync(CreateUserDto dto)
@@ -26,7 +29,7 @@ namespace OrdersApi.Services
                 Name         = dto.Name.Trim(),
                 Email        = dto.Email.Trim().ToLowerInvariant(),
                 PasswordHash = _hasher.Hash(dto.Password),
-                Role         = "Admin",
+                Role         = "Admin", // único valor permitido por CK_Users_Role en BD (sistema single-role)
                 Status       = "Active",
                 CreatedAt    = DateTime.UtcNow
             };
@@ -112,6 +115,9 @@ namespace OrdersApi.Services
             var user = await _repository.GetByIdAsync(id)
                 ?? throw new ArgumentException("Usuario no encontrado.");
 
+            if (id == requestingUserId)
+                throw new InvalidOperationException("No se puede eliminar el propio usuario.");
+
             if (user.Role == "Admin" && user.Status == "Active")
             {
                 var activeAdminCount = await _repository.CountActiveAdminsAsync();
@@ -132,7 +138,7 @@ namespace OrdersApi.Services
             return _hasher.Verify(password, user.PasswordHash) ? user : null;
         }
 
-        public async Task SeedAdminIfNoneExistsAsync(IConfiguration configuration)
+        public async Task SeedAdminIfNoneExistsAsync(IConfiguration configuration, bool isProduction)
         {
             if (await _repository.HasAnyUserAsync())
                 return;
@@ -144,7 +150,16 @@ namespace OrdersApi.Services
             if (string.IsNullOrWhiteSpace(name)  ||
                 string.IsNullOrWhiteSpace(email)  ||
                 string.IsNullOrWhiteSpace(password))
+            {
+                if (isProduction)
+                    throw new InvalidOperationException(
+                        "AdminSeed: tabla Users vacía y AdminSeed:Name/Email/Password no configurados en Production. " +
+                        "Configura los secrets ADMIN_SEED_* antes de desplegar.");
+
+                _logger.LogWarning("AdminSeed: tabla Users vacía pero AdminSeed:Name/Email/Password no configurados. " +
+                                   "El sistema inicia sin administrador en ambiente no-productivo.");
                 return;
+            }
 
             var admin = new User
             {
