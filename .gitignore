@@ -24,3 +24,7 @@ publish/
 
 # Auditorías locales (evidencias operacionales — no commitear)
 _auditoria/
+
+# Secrets locales
+.env
+*.env
