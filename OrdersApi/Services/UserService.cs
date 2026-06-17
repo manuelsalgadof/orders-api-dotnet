@@ -29,7 +29,7 @@ namespace OrdersApi.Services
                 Name         = dto.Name.Trim(),
                 Email        = dto.Email.Trim().ToLowerInvariant(),
                 PasswordHash = _hasher.Hash(dto.Password),
-                Role         = "Admin", // único valor permitido por CK_Users_Role en BD (sistema single-role)
+                Role         = ValidateRole(dto.Role),
                 Status       = "Active",
                 CreatedAt    = DateTime.UtcNow
             };
@@ -130,12 +130,24 @@ namespace OrdersApi.Services
 
         public async Task<User?> ValidateCredentialsAsync(string email, string password)
         {
-            var user = await _repository.GetByEmailAsync(email.Trim().ToLowerInvariant());
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            var user = await _repository.GetByEmailAsync(normalizedEmail);
 
             if (user is null || user.Status != "Active")
+            {
+                // Anti-enumeration: no revelar si el usuario existe o no
+                _logger.LogWarning("Auth failed for {Email}", normalizedEmail);
                 return null;
+            }
 
-            return _hasher.Verify(password, user.PasswordHash) ? user : null;
+            var valid = _hasher.Verify(password, user.PasswordHash);
+            if (!valid)
+            {
+                _logger.LogWarning("Auth failed for {Email}", normalizedEmail);
+                return null;
+            }
+
+            return user;
         }
 
         public async Task SeedAdminIfNoneExistsAsync(IConfiguration configuration, bool isProduction)
@@ -172,6 +184,16 @@ namespace OrdersApi.Services
             };
 
             await _repository.CreateAsync(admin);
+        }
+
+        private static string ValidateRole(string? role)
+        {
+            var allowed = new[] { "Admin", "Operator", "Viewer" };
+            if (string.IsNullOrWhiteSpace(role))
+                return "Viewer";
+            if (!allowed.Contains(role, StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException($"Rol inválido. Valores permitidos: {string.Join(", ", allowed)}.");
+            return role;
         }
 
         private static UserListItemDto MapToDto(User user) => new()

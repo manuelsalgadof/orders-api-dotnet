@@ -23,7 +23,7 @@ namespace OrdersApi.Controllers
         }
 
         [HttpPost("Generartoken")]
-        public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
+        public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken = default)
         {
             var user = await _userService.ValidateCredentialsAsync(request.Email, request.Password);
 
