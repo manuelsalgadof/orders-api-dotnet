@@ -1,194 +1,130 @@
-# 🚀 Orders API - .NET 9
+# OrderOps — Plataforma B2B de Gestión de Pedidos
+
+API REST cloud-ready desarrollada en .NET 9 para digitalizar la gestión de pedidos operacionales, reemplazando flujos manuales (Excel, correos, WhatsApp) por un sistema seguro, trazable e integrable.
+
+## Narrativa del proyecto
+
+OrderOps es una mini plataforma operacional B2B orientada a digitalizar pedidos, trazabilidad e integración para empresas chilenas — especialmente pymes, logística, proveedores y operaciones internas.
+
+## Stack técnico
+
+| Capa | Tecnología |
+|---|---|
+| Backend | .NET 9 / ASP.NET Core |
+| ORM | EF Core 9 (Database First) + Dapper |
+| Base de datos | SQL Server (Azure SQL Server) |
+| Autenticación | JWT Bearer |
+| Hashing | PBKDF2 versionado |
+| Contenedores | Docker (multi-stage) |
+| CI/CD | GitHub Actions → Docker Hub → Azure Container Apps |
+| Frontend | Angular 19 (proyecto separado: orders-front/) |
 
-![.NET](https://img.shields.io/badge/.NET-9-blue)
-![Docker](https://img.shields.io/badge/Docker-Ready-blue)
-![Azure](https://img.shields.io/badge/Azure-Container%20Apps-blue)
-![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-green)
-![SQL Server](https://img.shields.io/badge/Database-SQL%20Server-red)
+## Arquitectura
 
-API REST desarrollada en **ASP.NET Core (.NET 9)** con enfoque **Database First**, arquitectura por capas, seguridad JWT, pruebas unitarias y despliegue en Azure.
+N-Tier limpia: Controller → Service → Repository → DbContext
 
----
+```
+Controllers/     → Routing, auth, status codes HTTP
+Services/        → Lógica de negocio
+Repositories/    → Acceso a datos (EF Core + Dapper)
+Interfaces/      → Contratos entre capas
+DTOs/            → Entrada/salida desacoplada
+Entities/        → Modelos Database First
+BackgroundJobs/  → Procesamiento batch asíncrono
+Middlewares/     → Pipeline HTTP (CorrelationId, Logging)
+```
+
+## Endpoints
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| POST | /api/Auth/Generartoken | No | Login → JWT |
+| POST | /api/Orders | Sí | Crear pedido |
+| GET | /api/Orders | Sí | Listar pedidos (paginado) |
+| GET | /api/Orders/{id} | Sí | Detalle de pedido + items + historial |
+| GET | /api/Orders/export | Sí | Exportar CSV |
+| POST | /api/Jobs/reprocess-orders | Sí | Lanzar reprocesamiento batch |
+| GET | /api/Jobs/{id} | Sí | Estado del job |
+| POST | /api/Users | Admin | Crear usuario |
+| GET | /api/Users | Admin | Listar usuarios |
+| GET | /api/Users/{id} | Admin | Detalle usuario |
+| PUT | /api/Users/{id} | Admin | Actualizar usuario |
+| DELETE | /api/Users/{id} | Admin | Eliminar usuario |
+| GET | /health | No | Health check |
+| GET | / | No | Swagger UI |
+
+Roles disponibles: `Admin`, `Operator`, `Viewer`
+
+## Seguridad
+
+- JWT con validación completa (issuer, audience, lifetime, signing key)
+- Hashing PBKDF2 versionado (algoritmo + factor de trabajo + salt + hash)
+- Rate limiting: 60 req/min por IP
+- CORS por configuración — sin wildcard
+- Jwt:Key fail-fast en Production si no está configurado
+- Preflight CI/CD valida todos los secrets antes de desplegar
+- Admin seed desde configuración — sin credenciales hardcodeadas
+
+## Ejecución local
+
+### Con dotnet
+
+```bash
+cd OrdersApi
+dotnet restore
+dotnet run --project OrdersApi/OrdersApi.csproj
+```
+
+Swagger en: `https://localhost:7212` o `http://localhost:5199`
+
+### Con Docker
+
+```bash
+docker build -t orders-api -f OrdersApi/Dockerfile .
+docker run -p 8080:8080 orders-api
+```
+
+### Con Docker Compose (backend + frontend)
+
+```bash
+# Desde D:\Proyectos Personales\orders-front\
+docker compose up --build
+```
+
+## Variables de entorno requeridas
+
+| Variable | Descripción |
+|---|---|
+| ConnectionStrings__DefaultConnection | Connection string SQL Server |
+| Jwt__Key | Clave secreta JWT (mín. 32 chars) |
+| Jwt__Issuer | Issuer del token (ej: OrdersApi) |
+| Jwt__Audience | Audience del token (ej: OrdersApiUsers) |
+| AdminSeed__Name | Nombre del admin inicial |
+| AdminSeed__Email | Email del admin inicial |
+| AdminSeed__Password | Contraseña del admin inicial |
 
-## 🌐 Demo
+Local: usar `dotnet user-secrets` o `appsettings.Development.json` (NO versionar con secretos reales).
 
-Swagger disponible en:
+## Tests
 
-👉 https://orders-api-app.salmonrock-f04010b7.northeurope.azurecontainerapps.io/
+```bash
+dotnet test OrdersApi.Tests/OrdersApi.Tests.csproj
+```
 
----
+## CI/CD
 
-## 🧠 Descripción
+Push a `main` → build + test → Docker Hub → Azure Container Apps
 
-Este proyecto demuestra un flujo backend completo:
+Pipeline en `.github/workflows/dotnet-ci.yml`
 
-- Desarrollo de API RESTful
-- Diseño de base de datos en SQL Server
-- Uso de Entity Framework Core (Database First)
-- Ejecución de procesos batch con Dapper
-- Autenticación JWT
-- Dockerización
-- CI/CD con GitHub Actions
-- Despliegue en Azure Container Apps
-- Rate limiting y health checks
+## Base de datos
 
----
+Scripts en `bd/` — fuente de verdad del schema:
+1. `tablas.sql` — DDL principal
+2. `Users.sql` — tabla Users
+3. `roles-migration.sql` — ampliar roles (Admin, Operator, Viewer)
+4. `order-status-history.sql` — tabla historial + SP ProcessOrders actualizado
+5. `CREATE PROCEDURE ProcessOrders.sql` — SP original (reemplazado por script 4)
+6. `insercion de prueba.sql` — seed básico
 
-## 🏗️ Arquitectura
-
-Controller → Service → Repository → Database
-
----
-
-## 📂 Estructura
-
-Controllers/     → Endpoints HTTP  
-Services/        → Lógica de negocio  
-Repositories/    → Acceso a datos (EF + Dapper)  
-Interfaces/      → Contratos  
-DTOs/            → Entrada / salida (Data Transfer Objects)  
-Entities/        → Modelos generados desde BD  
-Data/            → DbContext  
-BackgroundJobs/  → Procesos async  
-Middlewares/     → Pipeline HTTP  
-
----
-
-## ⚙️ Funcionalidades
-
-### 🛒 Crear pedido
-
-POST /api/Orders  
-
-✔ Valida datos  
-✔ Calcula total  
-✔ Maneja duplicados con índice único  
-
-Respuestas:
-
-- 201 Created  
-- 409 Conflict  
-
----
-
-### 📄 Listar pedidos (paginado)
-
-GET /api/Orders?page=1&pageSize=10  
-
-✔ Paginación eficiente (Skip / Take)  
-✔ AsNoTracking para mejor rendimiento  
-
----
-
-### 🔄 Reproceso batch
-
-POST /api/Jobs/reprocess-orders  
-
-✔ Ejecuta Stored Procedure  
-✔ Usa Dapper  
-✔ Registra estado del job  
-
-GET /api/Jobs/{id}  
-
----
-
-### ❤️ Health Check
-
-GET /health  
-
----
-
-## 🔐 Seguridad
-
-- Autenticación JWT  
-- Swagger con soporte Bearer Token  
-- Rate limiting: 60 requests/min por IP  
-
----
-
-## ⚡ Performance
-
-- Paginación  
-- AsNoTracking  
-- Procesamiento en SQL Server (SP)  
-- Uso de Dapper para operaciones batch  
-
----
-
-## 🧱 Base de datos
-
-Diseñada en SQL Server con:
-
-- Relaciones (FK)  
-- Índices  
-
-Índice único para concurrencia:
-
-CREATE UNIQUE INDEX UX_Orders_ExternalReference  
-ON Orders(ExternalReference);  
-
----
-
-## 🧪 Testing
-
-Proyecto:
-
-OrdersApi.Tests  
-
-Incluye pruebas unitarias sobre lógica de negocio.
-
----
-
-## 🐳 Docker
-
-docker build -t orders-api-dotnet .  
-docker run -p 8080:8080 orders-api-dotnet  
-
----
-
-## 🔄 CI/CD
-
-GitHub Actions automatiza:
-
-Build → Test → Docker → Deploy  
-
----
-
-## ☁️ Azure
-
-Desplegado en:
-
-- Azure Container Apps  
-- Escalado controlado  
-- Integración con Docker Hub  
-
----
-
-## 🛡️ Buenas prácticas aplicadas
-
-- Clean Architecture (por capas)  
-- Principios SOLID  
-- DTOs para desacoplamiento  
-- Database First  
-- Manejo de concurrencia en BD  
-- Uso correcto de códigos HTTP  
-- Separación de responsabilidades  
-- Seguridad y control de acceso  
-- Protección contra abuso (rate limiting)  
-
----
-
-## 🧠 Qué demuestra este proyecto
-
-✔ Desarrollo backend completo  
-✔ Pensamiento orientado a arquitectura  
-✔ Experiencia real con SQL Server  
-✔ Integración cloud (Azure)  
-✔ Uso de contenedores  
-✔ Resolución de problemas en producción  
-
----
-
-## 👨‍💻 Autor
-
-Proyecto desarrollado como ejercicio práctico para demostrar habilidades en desarrollo backend con .NET, SQL Server, Docker y Azure.
+**IMPORTANTE**: Ejecutar scripts en Azure SQL requiere aprobación explícita.
