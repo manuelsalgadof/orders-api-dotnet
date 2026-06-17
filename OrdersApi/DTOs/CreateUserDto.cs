@@ -17,5 +17,8 @@ namespace OrdersApi.DTOs
         [MinLength(8)]
         [MaxLength(100)]
         public string Password { get; set; } = string.Empty;
+
+        [StringLength(50)]
+        public string Role { get; set; } = "Viewer";
     }
 }

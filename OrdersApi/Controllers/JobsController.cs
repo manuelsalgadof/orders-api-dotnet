@@ -18,7 +18,8 @@ namespace OrdersApi.Controllers
         }
 
         [HttpPost("reprocess-orders")]
-        public async Task<IActionResult> ReprocessOrders()
+        [Authorize(Policy = "OperatorUp")]
+        public async Task<IActionResult> ReprocessOrders(CancellationToken cancellationToken = default)
         {
             var result = await _service.ReprocessOrdersAsync();
 
@@ -30,7 +31,7 @@ namespace OrdersApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(Guid id)
+        public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
         {
             var result = await _service.GetByIdAsync(id);
 

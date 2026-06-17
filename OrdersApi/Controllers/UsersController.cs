@@ -20,7 +20,7 @@ namespace OrdersApi.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateUserDto dto)
+        public async Task<IActionResult> Create([FromBody] CreateUserDto dto, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -38,21 +38,21 @@ namespace OrdersApi.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
         {
             var result = await _userService.GetPagedAsync(page, pageSize);
             return Ok(result);
         }
 
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken = default)
         {
             var user = await _userService.GetByIdAsync(id);
             return user is null ? NotFound(new { message = "Usuario no encontrado." }) : Ok(user);
         }
 
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateUserDto dto)
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateUserDto dto, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -70,7 +70,7 @@ namespace OrdersApi.Controllers
         }
 
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken = default)
         {
             if (!TryGetRequestingUserId(out var requestingUserId))
                 return Unauthorized(new { message = "Token inválido." });

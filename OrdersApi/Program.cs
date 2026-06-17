@@ -98,6 +98,13 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly",   p => p.RequireRole("Admin"));
+    options.AddPolicy("OperatorUp",  p => p.RequireRole("Admin", "Operator"));
+    options.AddPolicy("ViewerUp",    p => p.RequireRole("Admin", "Operator", "Viewer"));
+});
+
 // Health Check
 builder.Services.AddHealthChecks();
 
@@ -165,6 +172,7 @@ app.UseHttpsRedirection();
 
 app.UseCors("FrontendPolicy");
 
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseRateLimiter();
