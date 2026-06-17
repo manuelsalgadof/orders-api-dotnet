@@ -62,12 +62,14 @@ jobs:
 
       - name: Validate required deployment secrets
         env:
+          DB_CONNECTION: ${{ secrets.DB_CONNECTION }}
           JWT_KEY: ${{ secrets.JWT_KEY }}
           ADMIN_SEED_NAME: ${{ secrets.ADMIN_SEED_NAME }}
           ADMIN_SEED_EMAIL: ${{ secrets.ADMIN_SEED_EMAIL }}
           ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
         run: |
           missing=0
+          [ -z "$DB_CONNECTION" ]       && echo "::error::DB_CONNECTION secret is missing or empty"       && missing=1
           [ -z "$JWT_KEY" ]             && echo "::error::JWT_KEY secret is missing or empty"             && missing=1
           [ -z "$ADMIN_SEED_NAME" ]     && echo "::error::ADMIN_SEED_NAME secret is missing or empty"     && missing=1
           [ -z "$ADMIN_SEED_EMAIL" ]    && echo "::error::ADMIN_SEED_EMAIL secret is missing or empty"    && missing=1
@@ -94,4 +96,5 @@ jobs:
               AdminSeed__Name="${{ secrets.ADMIN_SEED_NAME }}" \
               AdminSeed__Email="${{ secrets.ADMIN_SEED_EMAIL }}" \
               AdminSeed__Password="${{ secrets.ADMIN_SEED_PASSWORD }}" \
-              Jwt__Key="${{ secrets.JWT_KEY }}"
+              Jwt__Key="${{ secrets.JWT_KEY }}" \
+              Cors__AllowedOrigins__0="${{ secrets.CORS_ALLOWED_ORIGIN }}"
