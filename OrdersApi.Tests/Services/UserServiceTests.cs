@@ -49,7 +49,7 @@ namespace OrdersApi.Tests.Services
             Assert.Equal(1,             result.Id);
             Assert.Equal("Ana García",  result.Name);
             Assert.Equal("ana@test.com", result.Email);
-            Assert.Equal("Admin",        result.Role);
+            Assert.Equal("Viewer",       result.Role);
             Assert.Equal("Active",       result.Status);
 
             _hasherMock.Verify(h => h.Hash(dto.Password), Times.Once);
@@ -57,7 +57,7 @@ namespace OrdersApi.Tests.Services
                 u.Name         == "Ana García"  &&
                 u.Email        == "ana@test.com" &&
                 u.PasswordHash == "hashed-value" &&
-                u.Role         == "Admin"         &&
+                u.Role         == "Viewer"        &&
                 u.Status       == "Active"
             )), Times.Once);
         }
