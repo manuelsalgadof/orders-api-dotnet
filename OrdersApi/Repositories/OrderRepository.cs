@@ -41,5 +41,25 @@ namespace OrdersApi.Repositories
                 .Take(pageSize)
                 .ToListAsync();
         }
+
+        public async Task<Order?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        {
+            return await _context.Orders
+                .Include(o => o.Customer)
+                .Include(o => o.OrderItems)
+                .Include(o => o.StatusHistory.OrderBy(h => h.ChangedAt))
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+        }
+
+        public async Task<List<Order>> GetAllAsync(int maxRecords, CancellationToken cancellationToken = default)
+        {
+            return await _context.Orders
+                .Include(o => o.Customer)
+                .AsNoTracking()
+                .OrderByDescending(o => o.CreatedAt)
+                .Take(maxRecords)
+                .ToListAsync(cancellationToken);
+        }
     }
 }

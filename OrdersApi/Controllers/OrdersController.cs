@@ -19,7 +19,7 @@ namespace OrdersApi.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create(CreateOrderDto dto)
+        public async Task<IActionResult> Create(CreateOrderDto dto, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -37,10 +37,31 @@ namespace OrdersApi.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
         {
             var result = await _service.GetPagedAsync(page, pageSize);
             return Ok(result);
+        }
+
+        [HttpGet("export")]
+        [Authorize(Policy = "OperatorUp")]
+        public async Task<IActionResult> Export(CancellationToken cancellationToken = default)
+        {
+            var csv = await _service.ExportCsvAsync(cancellationToken);
+            return File(
+                System.Text.Encoding.UTF8.GetBytes(csv),
+                "text/csv",
+                $"orders-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv"
+            );
+        }
+
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken = default)
+        {
+            var result = await _service.GetByIdAsync(id, cancellationToken);
+            return result is null
+                ? NotFound(new { message = "Pedido no encontrado." })
+                : Ok(result);
         }
     }
 }

@@ -4,6 +4,8 @@ using OrdersApi.Entities;
 using OrdersApi.Interfaces;
 using Microsoft.Data.SqlClient;
 using OrdersApi.Exceptions;
+using System.Text;
+using System.Globalization;
 
 namespace OrdersApi.Services
 {
@@ -65,6 +67,69 @@ namespace OrdersApi.Services
             {
                 throw new DuplicateOrderException("Ya existe un pedido con la misma referencia externa.");
             }
+        }
+
+        public async Task<OrderDetailDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        {
+            var order = await _repository.GetByIdAsync(id, cancellationToken);
+            if (order is null) return null;
+
+            return new OrderDetailDto
+            {
+                Id                = order.Id,
+                CustomerId        = order.CustomerId,
+                CustomerName      = order.Customer?.Name ?? string.Empty,
+                ExternalReference = order.ExternalReference,
+                Total             = order.Total,
+                Status            = order.Status,
+                CreatedAt         = order.CreatedAt,
+                Items             = order.OrderItems.Select(i => new OrderItemResponseDto
+                {
+                    Id       = i.Id,
+                    Product  = i.Product,
+                    Quantity = i.Quantity,
+                    Price    = i.Price
+                }).ToList(),
+                StatusHistory     = order.StatusHistory.Select(h => new OrderStatusHistoryItemDto
+                {
+                    FromStatus = h.FromStatus,
+                    ToStatus   = h.ToStatus,
+                    ChangedAt  = h.ChangedAt,
+                    ChangedBy  = h.ChangedBy,
+                    Source     = h.Source
+                }).ToList()
+            };
+        }
+
+        public async Task<string> ExportCsvAsync(CancellationToken cancellationToken = default)
+        {
+            const int MaxExportRecords = 5000;
+            var orders = await _repository.GetAllAsync(MaxExportRecords, cancellationToken);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Id,CustomerId,CustomerName,ExternalReference,Total,Status,CreatedAt");
+
+            foreach (var o in orders)
+            {
+                sb.AppendLine(string.Join(",",
+                    o.Id,
+                    o.CustomerId,
+                    EscapeCsv(o.Customer?.Name ?? string.Empty),
+                    EscapeCsv(o.ExternalReference),
+                    o.Total.ToString("F2", CultureInfo.InvariantCulture),
+                    EscapeCsv(o.Status),
+                    o.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                ));
+            }
+
+            return sb.ToString();
+        }
+
+        private static string EscapeCsv(string value)
+        {
+            if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
+                return $"\"{value.Replace("\"", "\"\"")}\"";
+            return value;
         }
 
         public async Task<PagedResultDto<OrderListItemDto>> GetPagedAsync(int page, int pageSize)
