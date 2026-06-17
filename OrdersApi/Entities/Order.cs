@@ -20,4 +20,6 @@ public partial class Order
     public virtual Customer Customer { get; set; } = null!;
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+
+    public virtual ICollection<OrderStatusHistory> StatusHistory { get; set; } = new List<OrderStatusHistory>();
 }

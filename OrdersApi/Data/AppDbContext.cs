@@ -26,6 +26,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Customer>(entity =>
@@ -94,6 +96,28 @@ public partial class AppDbContext : DbContext
                 .HasMaxLength(20)
                 .HasDefaultValue("Active");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+        });
+
+        modelBuilder.Entity<OrderStatusHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_OrderStatusHistory");
+
+            entity.ToTable("OrderStatusHistory");
+
+            entity.Property(e => e.ToStatus).HasMaxLength(30).IsRequired();
+            entity.Property(e => e.FromStatus).HasMaxLength(30);
+            entity.Property(e => e.ChangedBy).HasMaxLength(256);
+            entity.Property(e => e.Source).HasMaxLength(50).HasDefaultValue("System");
+            entity.Property(e => e.ChangedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Order)
+                  .WithMany(p => p.StatusHistory)
+                  .HasForeignKey(d => d.OrderId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_OrderStatusHistory_Orders");
+
+            entity.HasIndex(e => new { e.OrderId, e.ChangedAt })
+                  .HasDatabaseName("IX_OrderStatusHistory_OrderId_ChangedAt");
         });
 
         OnModelCreatingPartial(modelBuilder);
