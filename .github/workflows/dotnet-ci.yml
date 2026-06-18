@@ -143,7 +143,7 @@ jobs:
             "${{ secrets.SMOKE_BACKEND_URL }}/api/Orders?page=1&pageSize=10" \
             -H "Authorization: Bearer $SMOKE_TOKEN")
           echo "GET /api/Orders → HTTP $HTTP_CODE"
-          [ "$HTTP_CODE" != "200" ] && echo "::error::GET /api/Orders falló con HTTP $HTTP_CODE" && exit 1
+          if [ "$HTTP_CODE" != "200" ]; then echo "::error::GET /api/Orders falló con HTTP $HTTP_CODE"; exit 1; fi
 
       - name: Smoke — GET frontend /
         run: |
@@ -151,7 +151,7 @@ jobs:
             --max-time 15 \
             "${{ secrets.SMOKE_FRONTEND_URL }}/")
           echo "GET frontend / → HTTP $HTTP_CODE"
-          [ "$HTTP_CODE" != "200" ] && echo "::error::Frontend no responde con HTTP $HTTP_CODE" && exit 1
+          if [ "$HTTP_CODE" != "200" ]; then echo "::error::Frontend no responde con HTTP $HTTP_CODE"; exit 1; fi
 
       - name: Smoke OK
         run: echo "Smoke post-deploy OK — backend + auth + orders + frontend respondieron correctamente."
