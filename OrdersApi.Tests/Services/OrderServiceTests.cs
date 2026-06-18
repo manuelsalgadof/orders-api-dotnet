@@ -358,5 +358,80 @@ namespace OrdersApi.Tests.Services
                 "Id,CustomerId,CustomerName,ExternalReference,Total,Status,CreatedAt",
                 lines[0].Trim());
         }
+
+        // ─── ExportCsvAsync — Formula Injection ───────────────────────────────────
+
+        [Theory]
+        [InlineData("=cmd|calc",   "'=cmd|calc")]
+        [InlineData("+SUM(A1:A2)", "'+SUM(A1:A2)")]
+        [InlineData("-10+20",      "'-10+20")]
+        [InlineData("texto normal","texto normal")]
+        public async Task ExportCsvAsync_FormulaInjection_CustomerName_IsPrefixedOrUnchanged(
+            string inputName, string expectedInCsv)
+        {
+            var order = BuildOrder(1, inputName, "REF-INJECT", 100m);
+            _repositoryMock
+                .Setup(r => r.GetAllAsync(5000, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Order> { order });
+
+            var csv = await _service.ExportCsvAsync();
+
+            Assert.Contains(expectedInCsv, csv);
+        }
+
+        [Fact]
+        public async Task ExportCsvAsync_FormulaInjection_AtSign_IsPrefixed()
+        {
+            var order = BuildOrder(1, "Normal", "@HYPERLINK(\"x\",\"y\")", 100m);
+            _repositoryMock
+                .Setup(r => r.GetAllAsync(5000, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Order> { order });
+
+            var csv = await _service.ExportCsvAsync();
+
+            Assert.Contains("'@HYPERLINK", csv);
+        }
+
+        [Fact]
+        public async Task ExportCsvAsync_FormulaWithComma_IsQuotedAndPrefixed()
+        {
+            var order = BuildOrder(1, "=formula, con coma", "REF-FC", 100m);
+            _repositoryMock
+                .Setup(r => r.GetAllAsync(5000, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Order> { order });
+
+            var csv = await _service.ExportCsvAsync();
+
+            // After prefix → "'=formula, con coma" → RFC-quoted → "\"'=formula, con coma\""
+            Assert.Contains("\"'=formula, con coma\"", csv);
+        }
+
+        [Fact]
+        public async Task ExportCsvAsync_FormulaInExternalReference_IsPrefixed()
+        {
+            var order = BuildOrder(1, "Normal Co", "=REF-FORMULA", 100m);
+            _repositoryMock
+                .Setup(r => r.GetAllAsync(5000, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Order> { order });
+
+            var csv = await _service.ExportCsvAsync();
+
+            Assert.Contains("'=REF-FORMULA", csv);
+            Assert.DoesNotContain(",=REF-FORMULA,", csv);
+        }
+
+        [Fact]
+        public async Task ExportCsvAsync_ExistingRfc4180Tests_StillPass_AfterFormulaFix()
+        {
+            // Regression: valores sin fórmula siguen escapando correctamente
+            var order = BuildOrder(1, "Acme, Inc.", "REF-001", 100m);
+            _repositoryMock
+                .Setup(r => r.GetAllAsync(5000, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Order> { order });
+
+            var csv = await _service.ExportCsvAsync();
+
+            Assert.Contains("\"Acme, Inc.\"", csv);
+        }
     }
 }
