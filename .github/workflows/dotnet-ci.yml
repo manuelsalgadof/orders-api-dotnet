@@ -67,6 +67,8 @@ jobs:
           ADMIN_SEED_NAME: ${{ secrets.ADMIN_SEED_NAME }}
           ADMIN_SEED_EMAIL: ${{ secrets.ADMIN_SEED_EMAIL }}
           ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+          SMOKE_BACKEND_URL: ${{ secrets.SMOKE_BACKEND_URL }}
+          SMOKE_FRONTEND_URL: ${{ secrets.SMOKE_FRONTEND_URL }}
         run: |
           missing=0
           [ -z "$DB_CONNECTION" ]       && echo "::error::DB_CONNECTION secret is missing or empty"       && missing=1
@@ -74,6 +76,8 @@ jobs:
           [ -z "$ADMIN_SEED_NAME" ]     && echo "::error::ADMIN_SEED_NAME secret is missing or empty"     && missing=1
           [ -z "$ADMIN_SEED_EMAIL" ]    && echo "::error::ADMIN_SEED_EMAIL secret is missing or empty"    && missing=1
           [ -z "$ADMIN_SEED_PASSWORD" ] && echo "::error::ADMIN_SEED_PASSWORD secret is missing or empty" && missing=1
+          [ -z "$SMOKE_BACKEND_URL" ]   && echo "::error::SMOKE_BACKEND_URL secret is missing or empty"   && missing=1
+          [ -z "$SMOKE_FRONTEND_URL" ]  && echo "::error::SMOKE_FRONTEND_URL secret is missing or empty"  && missing=1
           [ "$missing" -ne 0 ] && exit 1
           echo "All required secrets present."
 
@@ -98,3 +102,56 @@ jobs:
               AdminSeed__Password="${{ secrets.ADMIN_SEED_PASSWORD }}" \
               Jwt__Key="${{ secrets.JWT_KEY }}" \
               Cors__AllowedOrigins__0="${{ secrets.CORS_ALLOWED_ORIGIN }}"
+
+  smoke-post-deploy:
+    needs: docker-deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Wait for Container App to be ready
+        run: |
+          for i in $(seq 1 6); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 15 \
+              "${{ secrets.SMOKE_BACKEND_URL }}/health" || echo "000")
+            echo "Attempt $i: /health → $STATUS"
+            [ "$STATUS" = "200" ] && break
+            [ "$i" = "6" ] && echo "::error::Backend no responde después de 90s" && exit 1
+            sleep 15
+          done
+
+      - name: Smoke — POST /api/Auth/Generartoken
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            --max-time 15 \
+            -X POST "${{ secrets.SMOKE_BACKEND_URL }}/api/Auth/Generartoken" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"${{ secrets.ADMIN_SEED_EMAIL }}\",\"password\":\"${{ secrets.ADMIN_SEED_PASSWORD }}\"}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Login HTTP $HTTP_CODE"
+          [ "$HTTP_CODE" != "200" ] && echo "::error::Login falló con HTTP $HTTP_CODE" && exit 1
+          TOKEN=$(echo "$BODY" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+          [ -z "$TOKEN" ] && echo "::error::Token no encontrado en respuesta" && exit 1
+          echo "SMOKE_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Smoke — GET /api/Orders
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 15 \
+            "${{ secrets.SMOKE_BACKEND_URL }}/api/Orders?page=1&pageSize=10" \
+            -H "Authorization: Bearer $SMOKE_TOKEN")
+          echo "GET /api/Orders → HTTP $HTTP_CODE"
+          [ "$HTTP_CODE" != "200" ] && echo "::error::GET /api/Orders falló con HTTP $HTTP_CODE" && exit 1
+
+      - name: Smoke — GET frontend /
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 15 \
+            "${{ secrets.SMOKE_FRONTEND_URL }}/")
+          echo "GET frontend / → HTTP $HTTP_CODE"
+          [ "$HTTP_CODE" != "200" ] && echo "::error::Frontend no responde con HTTP $HTTP_CODE" && exit 1
+
+      - name: Smoke OK
+        run: echo "Smoke post-deploy OK — backend + auth + orders + frontend respondieron correctamente."
