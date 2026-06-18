@@ -106,7 +106,8 @@ builder.Services.AddAuthorization(options =>
 });
 
 // Health Check
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>(failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
 
 // CORS — orígenes desde configuración por ambiente (nunca wildcard)
 var allowedOrigins = builder.Configuration
@@ -159,7 +160,7 @@ if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey == jwtPlaceholder)
 // Middleware
 // =======================
 
-// Swagger en ra�z "/"
+// Swagger en raíz "/"
 app.UseSwagger();
 
 app.UseSwaggerUI(c =>
@@ -181,7 +182,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // /health queda SIN rate limiting
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "text/plain";
+        await context.Response.WriteAsync(report.Status.ToString());
+    }
+});
 
 // Controllers quedan CON rate limiting
 app.MapControllers()
