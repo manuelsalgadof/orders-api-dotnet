@@ -198,7 +198,34 @@ app.MapControllers()
 using (var scope = app.Services.CreateScope())
 {
     var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-    await userService.SeedAdminIfNoneExistsAsync(app.Configuration, app.Environment.IsProduction());
+    var startupLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    int[] retryDelays = [2000, 5000, 10000];
+    try
+    {
+        for (int attempt = 0; attempt <= retryDelays.Length; attempt++)
+        {
+            try
+            {
+                await userService.SeedAdminIfNoneExistsAsync(app.Configuration, app.Environment.IsProduction());
+                break;
+            }
+            catch (Exception ex) when (attempt < retryDelays.Length)
+            {
+                startupLogger.LogWarning(ex,
+                    "SeedAdmin intento {Attempt}/{MaxAttempts} fallido. Reintentando en {DelayMs}ms.",
+                    attempt + 1, retryDelays.Length + 1, retryDelays[attempt]);
+                await Task.Delay(retryDelays[attempt]);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        startupLogger.LogError(ex,
+            "SeedAdmin falló tras {MaxAttempts} intentos. Aplicación no puede iniciar.",
+            retryDelays.Length + 1);
+        throw;
+    }
 }
 
 app.Run();
