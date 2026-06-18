@@ -127,8 +127,14 @@ namespace OrdersApi.Services
 
         private static string EscapeCsv(string value)
         {
+            // CSV formula injection guard — prefix apostrophe if first char is dangerous
+            if (value.Length > 0 && value[0] is '=' or '+' or '-' or '@')
+                value = "'" + value;
+
+            // RFC 4180 escaping — after sanitization so apostrophe is also quoted if needed
             if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
                 return $"\"{value.Replace("\"", "\"\"")}\"";
+
             return value;
         }
 
