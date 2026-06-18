@@ -28,3 +28,4 @@ _auditoria/
 # Secrets locales
 .env
 *.env
+appsettings.*.json
